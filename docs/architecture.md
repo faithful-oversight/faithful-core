@@ -1,37 +1,34 @@
 # Architecture
 
-> **Status: planned.** This page describes the intended design. It changes as the design is decided and recorded in [architecture decision records](adr/index.md).
+## Shape of the library
 
-## Shape of the tool
-
-core is a command-line tool and a Python library with the same core.
+faithful-core is a Python library with no command-line tool. Each module does one job, and the modules depend on each other as little as possible.
 
 ```text
-inputs (values and files that a Faithful Oversight tool passes to it)
-        |
-        v
-  adapters   -> read one input format each, and record what they could not read
-        |
-        v
-  model      -> typed, validated records with a link back to each source record
-        |
-        v
-  analysis   -> pure functions: records in, findings out, no input or output
-        |
-        v
-  reporters  -> Markdown, HTML, CSV, and JSON output
+errors, exitcodes          shared names every tool agrees on
+safety, clock, render      pure functions: text in, text out
+console                    printing that cannot change an exit code
+xmlsafe                    untrusted XML in, element tree out
+files                      a set of files out, atomically
+collect.names, .script     small checks and a script loader
+collect.secrets            a secret reference in, a secret out, and redaction
+collect.winrm              the transport settings and the collection loop
 ```
+
+`collect.winrm` uses `collect.secrets` and `files`. `files` uses `errors`. `render` uses `safety`. No other module imports a sibling.
 
 ## Rules the design follows
 
-- **Separation.** Adapters handle input, analysis is pure logic, and reporters handle output. Analysis never reads files or prints.
-- **A versioned contract.** Machine-readable output follows a published JSON Schema with a version number. Breaking changes to the schema require a major release.
-- **No prompts.** The tool never asks questions interactively, so it runs unchanged in scripts and pipelines.
-- **Structured exit codes.** `0` means success with no findings, `1` means findings were reported, `2` means the command was used incorrectly, and `3` means the input could not be processed.
-- **Unknowns are results.** When the tool cannot verify something, it reports *unknown* with the reason, never *passed*.
-- **Read-only and offline.** The tool does not change the systems it examines and does not need network access.
+- **No runtime dependencies.** The library uses the standard library only. The WinRM transport needs `pypsrp`, which is an optional extra and is imported when it is first used. Each secret provider's package is imported the same way.
+- **Products keep their product logic.** The library holds what must behave the same everywhere. Report content, input formats, manifests, command-line options, and PowerShell scripts stay in each product.
+- **Parameters, not product names.** A product passes what differs: a temporary-file slug, a noun for messages, an install hint, a flag name. No message or docstring names a product.
+- **Unsafe input stays visible.** Output that people read shows invisible and reordering characters as escapes. Machine-readable output keeps exact values.
+- **Failures never change a decided exit code.** Printing, closing a pipe, and cleaning up after a failed collection do not raise a second error.
+- **A refusal is the safe answer.** When the file system cannot say whether a target is a protected file, the guard refuses.
+- **Public means documented.** Every module defines `__all__`, and a test checks it against [the API page](api.md).
 
 ## Packaging
 
-- Python package on PyPI: `faithful-core`, with the command `core`.
-- Further formats, such as a standalone executable or a container image, are added only when a decision record justifies them.
+- Python package on PyPI: `faithful-core`, with the import name `faithful_core`.
+- The package is typed. It ships a `py.typed` marker.
+- The extra `winrm` installs `pypsrp`.

@@ -55,3 +55,10 @@ PowerShell
 TOML
 CHANGELOG
 [Mm]isspelled
+gvul
+exitcodes
+xmlsafe
+remoting
+dataclass
+WSMan
+[Ii]nodes?

@@ -1,61 +1,93 @@
-# core
+# faithful-core
 
 **Shared foundation library.** The shared, tested foundation of the Faithful Oversight tools: safe output, atomic file publishing, console handling, and the WinRM collection plumbing.
 
 [![CI](https://github.com/faithful-oversight/faithful-core/actions/workflows/ci.yml/badge.svg)](https://github.com/faithful-oversight/faithful-core/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-> **Status: pre-release.** The repository holds the project foundation only. No feature is implemented yet, and nothing here is ready for production use.
+> **Status: pre-release.** The first release is 0.1.0. Read the stability promise below before you depend on it.
 
-## About the name
+## What it is
 
-*core* (core). The common base every Faithful Oversight tool builds on.
+*faithful-core* is the common base every Faithful Oversight tool builds on. It holds the code that must behave the same in every tool, so that each fix and each test lives in one place.
 
-## What it will do
+It has no command-line tool of its own, and it has no runtime dependencies. It uses the network only for the WinRM transport that a tool asks for.
 
-- Neutralize untrusted text before it reaches a terminal, a CSV file, Markdown, or HTML.
-- Publish a set of output files atomically, and refuse to overwrite a file the tool reads.
-- Print without letting a closed pipe or a narrow terminal change an exit code.
-- Parse XML safely, with limits on size, depth, and element count.
-- Provide the shared WinRM collection plumbing: target settings, secret lookup, and the transport loop.
+## Who uses it
 
-## What it will not do
+The Faithful Oversight tools: pakad, toledot, mishpat, shaar, merilo, and gvul. You can use it in your own tools too. The license allows it.
 
-- Ship a command-line tool of its own.
-- Use the network, except the WinRM transport that a product asks for.
-- Hold product logic, report formats, or PowerShell scripts. Those stay in each product.
+## What is in it
 
-See [docs/limitations.md](docs/limitations.md) for the full list.
+| Module | What it does |
+| --- | --- |
+| `faithful_core.errors` | One base error, `FaithfulError`, and the four errors a tool reports to its user. |
+| `faithful_core.exitcodes` | The exit codes every tool uses. |
+| `faithful_core.safety` | Makes untrusted text safe for a terminal, a CSV file, and Markdown. |
+| `faithful_core.clock` | Writes times the same way on every platform, and gives a repeatable report time. |
+| `faithful_core.console` | Prints without letting a closed pipe or a narrow terminal change an exit code. |
+| `faithful_core.xmlsafe` | Parses untrusted XML with limits on size, depth, and element count. |
+| `faithful_core.files` | Publishes a set of files atomically, and refuses to replace a file the tool reads. |
+| `faithful_core.render` | Small helpers for HTML, Markdown, and JSON reports. |
+| `faithful_core.collect.names` | Checks server and account names. Writes install hints. |
+| `faithful_core.collect.secrets` | Fetches a secret from a variable, a file, a keyring, Vault, AWS, or Azure. Removes it from text. |
+| `faithful_core.collect.script` | Loads a PowerShell script that a tool ships as package data. |
+| `faithful_core.collect.winrm` | The WinRM transport settings and the collection loop. |
 
-## Design goals
+[docs/api.md](docs/api.md) describes every name.
 
-- **Read-only.** The tool will never change the systems it examines.
-- **Offline first.** Inputs will be exported files, with no network access required.
-- **Explicit unknowns.** Every report will state what the tool could not see or verify.
-- **Traceable findings.** Every finding will point back to its source record and the rule that produced it.
-- **Synthetic test data only.** Fixtures are hand-made or generated. No real organization's data is ever committed.
+## Stability promise
+
+- The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+- The names listed in [docs/api.md](docs/api.md) are the public interface. A breaking change to one of them needs a new major version. While the version is below 1.0.0, a minor version can break them, and the changelog says so.
+- Anything that starts with an underscore is private. It can change in any release.
+- Messages are for people. Their wording can change in any release, so do not match on it.
+- Exit code values and the `FaithfulError` hierarchy are part of the public interface.
 
 ## Installation
 
-Not yet on PyPI. Until the first release, install the development version from GitHub:
-
 ```shell
-pipx install git+https://github.com/faithful-oversight/faithful-core
-pipx ensurepath
+pip install faithful-core
 ```
 
-`pipx ensurepath` puts the `core` command on your PATH; run it once and open a new terminal. After the first release, the package will install with `pipx install faithful-core`.
+The WinRM transport needs `pypsrp`. It is an optional extra:
+
+```shell
+pip install "faithful-core[winrm]"
+```
+
+Until the first release, install the development version from GitHub:
+
+```shell
+pip install git+https://github.com/faithful-oversight/faithful-core
+```
 
 To work from source, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Usage
 
-```shell
-core --version
+```python
+from pathlib import Path
+
+from faithful_core.files import write_files
+from faithful_core.render import md_table
+from faithful_core.safety import terminal_line
+
+rows = [["alice", "=1+1"], ["bob", "line one\nline two"]]
+report = "\n".join(md_table(("Name", "Note"), rows)) + "\n"
+
+written = write_files(
+    Path("report"),
+    {"report.md": report},
+    force=False,
+    slug="example",
+)
+print(terminal_line(str(written[0])))
 ```
 
 ## Documentation
 
+- [API](docs/api.md)
 - [Architecture](docs/architecture.md)
 - [Threat model](docs/threat-model.md)
 - [Limitations](docs/limitations.md)
