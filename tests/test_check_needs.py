@@ -20,7 +20,7 @@ assert _spec.loader is not None
 check_needs = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(check_needs)
 
-CORE = ("static", "test", "docs", "links", "security", "build")
+CORE = ("static", "test", "downstream", "docs", "links", "security", "build")
 NON_PULL_REQUEST_EVENTS = ("push", "merge_group", "schedule", "workflow_dispatch")
 
 

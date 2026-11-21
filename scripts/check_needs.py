@@ -26,7 +26,17 @@ import sys
 from typing import Any
 
 EXPECTED = frozenset(
-    {"static", "test", "docs", "links", "security", "build", "pull-request", "dependency-review"}
+    {
+        "static",
+        "test",
+        "downstream",
+        "docs",
+        "links",
+        "security",
+        "build",
+        "pull-request",
+        "dependency-review",
+    }
 )
 """The jobs the aggregate waits for. Keep in sync with ``needs`` in ci.yml; a test checks it."""
 
