@@ -1,0 +1,238 @@
+name: Release
+
+# Run manually from the Actions tab on main. See docs/releasing.md.
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  UV_LOCKED: "1"
+  # The one pinned uv release for this workflow. setup-uv checks its checksum.
+  # Change it with every workflow and docs/releasing.md in the same pull request.
+  FO_UV_VERSION: "0.11.32"
+
+jobs:
+  preflight:
+    name: Preflight
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      checks: read # confirm CI passed on the release commit
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      # Whether this release is public, read from the repository itself.
+      public: ${{ steps.visibility.outputs.public }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Require FO_PUBLIC to match the repository's real visibility
+        # Public releases get provenance and a PyPI upload. Later jobs use this
+        # step's answer, never the variable alone.
+        id: visibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FO_PUBLIC: ${{ vars.FO_PUBLIC }}
+          REPO: ${{ github.repository }}
+        run: scripts/check_visibility.sh "$REPO"
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.FO_UV_VERSION }}
+          enable-cache: false
+      - name: Check version, changelog, and tag
+        id: check
+        run: |
+          version="$(uv run --no-project python scripts/release_preflight.py "$RUNNER_TEMP/notes.md")"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Require a passing CI run on this commit, waiting for one in progress
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          # 15368 is the GitHub Actions app, so a check from another app cannot satisfy this.
+          query="check_name=All%20checks%20passed&filter=latest&app_id=15368"
+          # CI on a fresh merge can still be running; wait up to 20 minutes for it.
+          deadline=$(( $(date +%s) + 1200 ))
+          while :; do
+            # shellcheck disable=SC2016 # $c is a jq variable, not a shell one
+            state="$(gh api "repos/${REPO}/commits/${SHA}/check-runs?${query}" --jq '
+              [.check_runs[] | .conclusion // "pending"] as $c
+              | if ($c | index("success")) then "success"
+                elif ($c | length) == 0 or ($c | index("pending")) then "pending"
+                else "failed" end')"
+            case "$state" in
+              success) echo "CI passed on ${SHA}"; exit 0 ;;
+              failed) echo "::error::CI failed on ${SHA}; fix main, then run the release again"; exit 1 ;;
+            esac
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::CI has not finished on ${SHA} after 20 minutes; check CI, then run the release again"
+              exit 1
+            fi
+            echo "CI is still running on ${SHA}; checking again in 30 seconds"
+            sleep 30
+          done
+
+  checks:
+    name: Full check suite
+    needs: preflight
+    permissions:
+      contents: read
+      pull-requests: read # needed by the reused CI workflow's pull request job
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build and smoke-test artifacts
+    needs: [preflight, checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.FO_UV_VERSION }}
+          enable-cache: false
+      - run: uv sync --locked
+      - name: Build with the pinned backend and smoke-test the exact wheel
+        # These are the bytes every later job publishes. Nothing is rebuilt.
+        run: scripts/check.sh build
+      - name: Write release notes and confirm the SBOM and checksums
+        run: |
+          uv run --no-sync python scripts/release_preflight.py release-notes.md >/dev/null
+          # check.sh build already wrote the SBOMs and dist/SHA256SUMS with
+          # scripts/release_evidence.sh, and proved a rebuild matches them.
+          test -s dist/sbom-base.cdx.json
+          # A project that defines optional extras also has an all-extras SBOM.
+          if grep -q '^\[project.optional-dependencies\]' pyproject.toml; then
+            test -s dist/sbom-all-extras.cdx.json
+          fi
+          scripts/verify_artifacts.sh dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: |
+            dist/
+            release-notes.md
+          if-no-files-found: error
+
+  github-draft:
+    name: Stage draft GitHub release
+    needs: [preflight, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # create the draft release and upload assets
+      id-token: write # sign build provenance attestations
+      attestations: write # store build provenance attestations
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: release
+      - name: Verify the downloaded files against SHA256SUMS
+        run: scripts/verify_artifacts.sh release/dist
+      - name: Attest build provenance
+        # Attestations for private repositories need GitHub Enterprise Cloud.
+        if: needs.preflight.outputs.public == 'true'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: release/dist/*
+      - name: Create or resume the draft and upload missing assets
+        # Existing assets must match these bytes; anything else stops the release.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          python3 scripts/publish_release.py stage --repo "$REPO" --tag "v${VERSION}" \
+            --target "$SHA" --notes release/release-notes.md release/dist/*
+
+  pypi:
+    name: Publish to PyPI
+    needs: [preflight, github-draft]
+    if: needs.preflight.outputs.public == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: pypi
+      url: https://pypi.org/project/faithful-core/${{ needs.preflight.outputs.version }}/
+    permissions:
+      contents: read
+      id-token: write # PyPI trusted publishing
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: release
+      - name: Verify the downloaded files against SHA256SUMS
+        run: scripts/verify_artifacts.sh release/dist
+      - name: Keep only Python distributions
+        run: |
+          mkdir -p dist
+          cp release/dist/*.whl release/dist/*.tar.gz dist/
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          # A rerun skips files PyPI already has; the next step proves they match.
+          skip-existing: true
+      - name: Verify PyPI holds exactly these bytes
+        # The publish action leaves a *.publish.attestation file beside each upload in
+        # dist/; PyPI keeps those as provenance, not as files, so compare only the
+        # wheel and source archive.
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: >-
+          python3 scripts/publish_release.py verify-pypi --project faithful-core
+          --version "$VERSION" dist/*.whl dist/*.tar.gz
+
+  github-publish:
+    name: Publish GitHub release
+    needs: [preflight, github-draft, pypi]
+    # Runs after PyPI publishing, or when publishing is skipped because the
+    # repository is private. A public release never skips PyPI.
+    if: >-
+      always() && needs.github-draft.result == 'success'
+      && (needs.pypi.result == 'success'
+      || (needs.pypi.result == 'skipped' && needs.preflight.outputs.public != 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # publish the draft, which creates the tag
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: release
+      - name: Verify the downloaded files against SHA256SUMS
+        run: scripts/verify_artifacts.sh release/dist
+      - name: Check the draft is complete, then publish it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          python3 scripts/publish_release.py publish --repo "$REPO" --tag "v${VERSION}" \
+            --target "$SHA" release/dist/*

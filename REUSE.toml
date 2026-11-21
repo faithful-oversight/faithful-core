@@ -1,0 +1,27 @@
+version = 1
+
+[[annotations]]
+path = [
+  "**/*.md",
+  "**/*.toml",
+  "**/*.yml",
+  "**/*.yaml",
+  "**/*.json",
+  "**/*.ini",
+  "**/*.txt",
+  ".editorconfig",
+  ".gitattributes",
+  ".gitignore",
+  ".python-version",
+  ".github/CODEOWNERS",
+  "NOTICE",
+  "uv.lock",
+  "src/**/py.typed",
+  "**/*.png",
+  "**/*.csv",
+  "**/*.jsonl",
+  "**/*.html",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Faithful Oversight, LLC"
+SPDX-License-Identifier = "Apache-2.0"
