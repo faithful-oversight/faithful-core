@@ -450,6 +450,8 @@ def test_a_permission_error_while_checking_targets_is_an_output_error(
 
 
 def test_a_path_that_is_not_utf8_is_shown_as_an_escape_in_a_message(tmp_path: Path) -> None:
+    if sys.platform == "win32":
+        pytest.skip("Windows file names are UTF-16, so a lone surrogate is not a stray byte")
     blocker = tmp_path / "file-\udcff"
     try:
         blocker.write_bytes(b"x")

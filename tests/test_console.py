@@ -88,6 +88,8 @@ def child(*, close_stdout: bool = False, **env: str) -> tuple[int, bytes, bytes]
         process.stdin.close()
         stderr = process.stderr.read()
         out = b"" if close_stdout else process.stdout.read()
+        # Text streams on Windows write a line ending as CRLF; compare in one form.
+        out, stderr = out.replace(b"\r\n", b"\n"), stderr.replace(b"\r\n", b"\n")
         return process.wait(timeout=120), out, stderr
 
 

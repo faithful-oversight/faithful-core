@@ -376,6 +376,8 @@ def test_one_call_cannot_borrow_the_hint_of_another(monkeypatch: pytest.MonkeyPa
 
 
 def test_a_secret_file_name_that_is_not_utf8_is_shown_as_an_escape(tmp_path: Path) -> None:
+    if sys.platform == "win32":
+        pytest.skip("Windows file names are UTF-16, so a lone surrogate is not a stray byte")
     path = tmp_path / "secret-\udcff.txt"
     try:
         path.write_bytes(SECRET.encode() + b"\xff\xfe")
