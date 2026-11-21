@@ -118,7 +118,7 @@ def test_copy_fallback_never_removes_a_file_it_did_not_create(
     no_hard_links("")
     real_open = os.open
 
-    def racing_open(path: str, flags: int, mode: int = 0o777) -> int:
+    def racing_open(path: str, flags: int, mode: int = 0o600) -> int:
         if str(path).endswith("b.txt"):
             Path(path).write_text("someone else", encoding="utf-8")
         return real_open(path, flags, mode)

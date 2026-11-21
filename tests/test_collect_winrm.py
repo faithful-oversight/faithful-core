@@ -768,7 +768,7 @@ def test_publish_file_without_hard_links_never_clobbers_a_name_that_appears(
     temp, out = staged(tmp_path), tmp_path / "out.txt"
     real_open = os.open
 
-    def racing_open(path: str, flags: int, mode: int = 0o777) -> int:
+    def racing_open(path: str, flags: int, mode: int = 0o600) -> int:
         if str(path).endswith("out.txt"):
             out.write_bytes(b"arrived")
         return real_open(path, flags, mode)

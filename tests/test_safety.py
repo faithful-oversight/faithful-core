@@ -229,7 +229,7 @@ def test_markdown_escaping_leaves_no_active_characters(value: str) -> None:
 
 @given(st.text())
 def test_terminal_output_has_no_control_characters(value: str) -> None:
-    assert not re.search("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]", terminal(value))
+    assert not re.search(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]", terminal(value))
 
 
 @given(st.text())
