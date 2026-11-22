@@ -177,7 +177,8 @@ def write_files(  # noqa: PLR0913 - one call states the whole publish: where, wh
 
     Raises:
         OutputError: A target exists and ``force`` is false, a target is a directory, a
-            target or a file to remove is a protected file, or writing fails. The directory is left as it was.
+            target or a file to remove is a protected file, or writing fails. The directory
+            is left as it was.
         ValueError: ``slug`` is not usable in a file name. This is a programming error.
     """
     if not _SLUG.fullmatch(slug):
