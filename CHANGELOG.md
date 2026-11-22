@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-21
+
+### Fixed
+
+- `write_files` checks the files that `remove` names against `protect`, as it already checked the files it writes. Before, with `force`, a protected file listed as stale was deleted ([#3](https://github.com/faithful-oversight/faithful-core/issues/3)).
+
+### Changed
+
+- The README, limitations and threat model name every network path: the WinRM transport and the Vault, AWS Secrets Manager, and Azure Key Vault secret providers, each used only when a product asks for it ([#4](https://github.com/faithful-oversight/faithful-core/issues/4)).
+- The API page says `Target` does not check its fields.
+- CI's downstream job checks that each product runs the core under test, and warns when a product does not depend on core yet.
+
 ## [0.1.0] - 2026-11-21
 
 ### Added

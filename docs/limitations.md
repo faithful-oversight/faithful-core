@@ -7,7 +7,7 @@ faithful-core is honest about what it cannot do.
 The library does not:
 
 - Ship a command-line tool of its own.
-- Use the network, except the WinRM transport that a product asks for.
+- Use the network, except where a product asks for it: the WinRM transport, and the Vault, AWS Secrets Manager, and Azure Key Vault secret providers. The providers' SDKs also look for credentials in their usual places, such as environment variables and the instance metadata service.
 - Hold product logic, report formats, or PowerShell scripts. Those stay in each product.
 - Define a manifest format. The products write different manifests, and each keeps its own.
 

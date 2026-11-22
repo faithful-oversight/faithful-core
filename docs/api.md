@@ -153,7 +153,7 @@ Transport security is not optional. HTTPS always verifies the certificate. Plain
 
 | Name | What it does |
 | --- | --- |
-| `Target` | A frozen dataclass: `server`, `auth`, `username`, `secret`, `transport`, `port`, `ca_file`, `connect_timeout`, `idle_timeout`. The secret is left out of its `repr`. |
+| `Target` | A frozen dataclass: `server`, `auth`, `username`, `secret`, `transport`, `port`, `ca_file`, `connect_timeout`, `idle_timeout`. The secret is left out of its `repr`. It does not check its fields: call `server_name` and `account_name` on the values before you build one. |
 | `AUTHS`, `TRANSPORTS` | The accepted authentication methods and transports. |
 | `POLL_SECONDS` | How long one wait for output lasts. |
 | `settings(target)` | Returns the WSMan settings, and refuses any insecure combination. |

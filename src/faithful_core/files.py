@@ -166,8 +166,9 @@ def write_files(  # noqa: PLR0913 - one call states the whole publish: where, wh
         force: Replace files that exist.
         slug: A short name for the calling tool. Temporary files are named
             ``.<slug>-*.tmp`` and ``.<slug>-old-*.bak``.
-        protect: ``(role, path)`` pairs for files and folders that must never be replaced
-            or written into; see :func:`refuse_aliases`.
+        protect: ``(role, path)`` pairs for files and folders that must never be replaced,
+            removed, or written into; see :func:`refuse_aliases`. Both the files written and
+            the files ``remove`` names are checked.
         remove: Names of files from an earlier run that this run does not write. With
             ``force`` the plain files among them are removed in the same swap.
 
@@ -176,20 +177,22 @@ def write_files(  # noqa: PLR0913 - one call states the whole publish: where, wh
 
     Raises:
         OutputError: A target exists and ``force`` is false, a target is a directory, a
-            target is a protected file, or writing fails. The directory is left as it was.
+            target or a file to remove is a protected file, or writing fails. The directory
+            is left as it was.
         ValueError: ``slug`` is not usable in a file name. This is a programming error.
     """
     if not _SLUG.fullmatch(slug):
         msg = f"slug {slug!r} cannot be used in a file name"
         raise ValueError(msg)
-    refuse_aliases((directory / name for name in files), protect)
+    targets = [directory / name for name in files]
+    removing = [name for name in dict.fromkeys(remove) if name not in files]
+    # A protected file must survive the removal of stale files as well as the writes.
+    refuse_aliases([*targets, *(directory / name for name in removing)], list(protect))
     try:
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     except OSError as exc:
         msg = f"cannot create {_shown(directory)}: {exc.strerror}"
         raise OutputError(msg) from exc
-    targets = [directory / name for name in files]
-    removing = [name for name in remove if name not in files]
     try:
         _check_targets(targets, force=force, removing=bool(removing))
     except OSError as exc:

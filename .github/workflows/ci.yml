@@ -128,6 +128,30 @@ jobs:
         run: |
           uv sync --locked --all-extras
           uv pip install --python .venv --no-deps ../core
+      # Proves the tests below run this checkout of core: the installed copy must
+      # come from ../core, not from PyPI. A product that does not depend on core yet
+      # gets a warning, because its tests cannot exercise core at all.
+      - name: Check that the product uses this core
+        working-directory: product
+        run: |
+          .venv/bin/python - <<'PY'
+          import json, pathlib, sys, tomllib
+          from importlib import metadata
+          from urllib.parse import unquote, urlparse
+
+          dist = metadata.distribution("faithful-core")
+          origin = json.loads(dist.read_text("direct_url.json") or "{}").get("url", "")
+          core = pathlib.Path("../core").resolve()
+          source = urlparse(origin)
+          if source.scheme != "file" or pathlib.Path(unquote(source.path)).resolve() != core:
+              sys.exit(f"faithful-core {dist.version} came from {origin or 'an index'}, not {core}")
+          import faithful_core
+          print(f"faithful-core {dist.version} from {origin}, imported from {faithful_core.__file__}")
+          deps = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["dependencies"]
+          if not any(d.replace("_", "-").lower().startswith("faithful-core") for d in deps):
+              print("::warning::this product does not depend on faithful-core yet; "
+                    "its tests do not exercise this core")
+          PY
       - name: Run the product's tests
         working-directory: product
         run: scripts/check.sh test

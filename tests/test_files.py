@@ -717,3 +717,49 @@ def test_a_target_that_cannot_be_examined_refuses_the_run(
     monkeypatch.setattr(Path, "stat", stat)
     with pytest.raises(OutputError, match=r"cannot compare .*: Permission denied"):
         refuse_aliases([tmp_path / "out" / "a.txt"], [("input folder", folder)])
+
+
+def test_force_never_removes_a_protected_file_listed_as_stale(tmp_path: Path) -> None:
+    evidence = tmp_path / "evidence.csv"
+    evidence.write_bytes(b"synthetic input\n")
+    with pytest.raises(OutputError, match="same file as the input"):
+        write_files(
+            tmp_path,
+            {"report.json": "{}"},
+            force=True,
+            slug=SLUG,
+            protect=iter([("input", evidence)]),
+            remove=iter(["evidence.csv"]),
+        )
+    assert evidence.read_bytes() == b"synthetic input\n"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["evidence.csv"]
+
+
+@pytest.mark.parametrize("kind", ["hard link", "symbolic link"])
+def test_force_never_removes_a_stale_name_that_is_an_alias_of_a_protected_file(
+    tmp_path: Path, kind: str
+) -> None:
+    source = tmp_path / "inputs"
+    source.mkdir()
+    evidence = source / "evidence.csv"
+    evidence.write_bytes(b"synthetic input\n")
+    out = tmp_path / "out"
+    out.mkdir()
+    try:
+        if kind == "hard link":
+            os.link(evidence, out / "old.csv")
+        else:
+            (out / "old.csv").symlink_to(evidence)
+    except (OSError, NotImplementedError):
+        pytest.skip(f"this file system cannot make a {kind}")
+    with pytest.raises(OutputError, match="same file as the input"):
+        write_files(
+            out,
+            {"report.json": "{}"},
+            force=True,
+            slug=SLUG,
+            protect=[("input", evidence)],
+            remove=["old.csv"],
+        )
+    assert evidence.read_bytes() == b"synthetic input\n"
+    assert sorted(p.name for p in out.iterdir()) == ["old.csv"]
