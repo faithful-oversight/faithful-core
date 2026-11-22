@@ -29,6 +29,8 @@ The steps that publish are in `scripts/publish_release.py`, which has its own te
 
 ## First publish to PyPI
 
+This was done for 0.1.0 on 2026-11-21. The steps stay here for reference, for example if the project ever moves to another PyPI account or organization.
+
 Until the first PyPI release exists, the package is not on PyPI, and the name `faithful-core` is unclaimed: anyone could register it. Set up trusted publishing, then release a new version, as soon as possible.
 
 1. On the PyPI website, open **Your account**, then **Publishing**, and add a **pending publisher** with these fields. They must match `.github/workflows/release.yml` exactly.

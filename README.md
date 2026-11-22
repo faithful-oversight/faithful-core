@@ -5,13 +5,13 @@
 [![CI](https://github.com/faithful-oversight/faithful-core/actions/workflows/ci.yml/badge.svg)](https://github.com/faithful-oversight/faithful-core/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-> **Status: pre-release.** The first release is 0.1.0. Read the stability promise below before you depend on it.
+> **Status: early.** The first release, 0.1.0, is on PyPI. Read the stability promise below before you depend on it.
 
 ## What it is
 
 *faithful-core* is the common base every Faithful Oversight tool builds on. It holds the code that must behave the same in every tool, so that each fix and each test lives in one place.
 
-It has no command-line tool of its own, and it has no runtime dependencies. It uses the network only for the WinRM transport that a tool asks for.
+It has no command-line tool of its own, and it has no runtime dependencies. Its foundation modules never use the network. Two parts can, and only when a tool asks for them: the WinRM transport, and the Vault, AWS Secrets Manager, and Azure Key Vault secret providers. Those providers use their own SDKs, which the tool installs, and each SDK's usual way of finding credentials. The library sends no telemetry.
 
 ## Who uses it
 
@@ -56,7 +56,7 @@ The WinRM transport needs `pypsrp`. It is an optional extra:
 pip install "faithful-core[winrm]"
 ```
 
-Until the first release, install the development version from GitHub:
+To try unreleased changes, install the development version from GitHub:
 
 ```shell
 pip install git+https://github.com/faithful-oversight/faithful-core

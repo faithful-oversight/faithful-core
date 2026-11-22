@@ -30,7 +30,9 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# The WinRM transport in faithful_core.collect.winrm. Everything else needs no dependencies.
+# The WinRM transport in faithful_core.collect.winrm. The remote secret providers in
+# faithful_core.collect.secrets use SDKs that the calling product installs. Everything else
+# needs no dependencies.
 # The specifier matches the "live" extra of the products that use it.
 winrm = ["pypsrp>=0.8"]
 
