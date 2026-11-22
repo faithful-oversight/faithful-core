@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "faithful-core"
-version = "0.1.0"
+version = "0.1.1"
 description = "Shared foundation library: The shared, tested foundation of the Faithful Oversight tools: safe output, atomic file publishing, console handling, and the WinRM collection plumbing."
 readme = "README.md"
 requires-python = ">=3.11"
